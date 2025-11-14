@@ -1,48 +1,43 @@
 import express from "express";
-import fetch from "node-fetch";
+import axios from "axios";
 import cors from "cors";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Load HF_TOKEN from Render environment variables
-const HF_TOKEN = process.env.HF_TOKEN;
+app.post("/chat", async (req, res) => {
+  const userMessage = req.body.message;
 
-if (!HF_TOKEN) {
-  console.error("❌ ERROR: Missing HF_TOKEN environment variable!");
-}
-
-app.post("/proxy", async (req, res) => {
   try {
-    const userPrompt = req.body.prompt;
-
-    if (!userPrompt) {
-      return res.status(400).json({ error: "Missing prompt" });
-    }
-
-    const response = await fetch(
-      "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-72B-Instruct",
+    const response = await axios.post(
+      "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-7B-Instruct",
       {
-        method: "POST",
+        inputs: userMessage
+      },
+      {
         headers: {
-          "Authorization": `Bearer ${HF_TOKEN}`,
+          Authorization: `Bearer ${process.env.HF_TOKEN}`,
           "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ inputs: userPrompt })
+        }
       }
     );
 
-    const data = await response.json();
-    return res.json(data);
-
+    res.json({ reply: response.data[0].generated_text });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
+    console.error(err.response?.data || err.message);
+    res.status(500).json({ error: "HF API error" });
   }
+});
+
+app.get("/", (req, res) => {
+  res.send("Qwen Proxy is working!");
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log("🚀 Proxy server running on port " + PORT);
+  console.log(`Server running on port ${PORT}`);
 });
